@@ -47,8 +47,9 @@ let rec run computer =
 
 let%test _ = run ([1; 1; 1; 3; 99], 0) = ([1; 1; 1; 2; 99], 4)
 
-let run_1202 program =
-  let altered_program = program |> (store_at 1 12) |> (store_at 2 2) in
+let run_with program noun verb =
+  let altered_program = program |> (store_at 1 noun) |> (store_at 2 verb) in
   let (result, _) = run (altered_program, 0) in
   List.nth result 0
 
+let run_1202 program = run_with program 12 02

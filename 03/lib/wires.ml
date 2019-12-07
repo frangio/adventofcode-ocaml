@@ -59,7 +59,7 @@ module Point =
 
 module PointMap = Map.Make(Point)
 
-let closest_intersection cables : point =
+let intersections cables : point Seq.t =
   let cable_counts =
     cables
     |> List.map (fun cable ->
@@ -70,12 +70,49 @@ let closest_intersection cables : point =
         |> PointMap.of_seq)
     |> List.fold_left (PointMap.union (fun _ a b -> Some (a + b))) PointMap.empty
   in
-  let (point, _) =
-    cable_counts
-    |> PointMap.filter (fun _ count -> count >= 2)
-    |> PointMap.min_binding
-  in
-  point
+  cable_counts
+  |> PointMap.to_seq
+  |> Seq.filter (fun (_, count) -> count >= 2)
+  |> Seq.map (fun (p, _) -> p) 
+
+exception No_intersections
+
+let closest_intersection cables : point =
+  let iseq = intersections cables in
+  match iseq () with
+  | Cons (first, _) -> first
+  | Nil -> raise No_intersections
 
 let%test _ = closest_intersection [[(Right, 1)]; [(Right, 1)]] = (1, 0)
 let%test _ = closest_intersection [[(Right, 1); (Up, 1)]; [(Up, 1); (Right, 1)]] = (1, 1)
+
+exception Unreachable_point
+
+let cost_to_reach point cable : int =
+  let cost = ref None in
+  let () = List.iteri (fun i p -> if point = p then cost := Some i) (list_points cable) in
+  match !cost with
+  | Some k -> k + 1
+  | None -> raise Unreachable_point
+
+let%test _ = cost_to_reach (1, 0) [(Right, 5)] = 1
+let%test _ = cost_to_reach (4, 0) [(Right, 5)] = 4
+let%test _ = cost_to_reach (5, 2) [(Right, 5); (Up, 5)] = 7
+
+let fastest_intersection cables : int =
+  let points = List.of_seq (intersections cables) in
+  let costs =
+    List.map (fun p -> (p,
+      cables
+      |> List.map (cost_to_reach p)
+      |> List.fold_left (+) 0))
+    points
+  in
+  let (_, k) =
+    List.fold_left (fun (p1, k1) (p2, k2) -> if k1 < k2 then (p1, k1) else (p2, k2))
+    (List.hd costs)
+    (List.tl costs)
+  in
+  k
+
+let%test _ = fastest_intersection [[(Right, 1)]; [(Right, 1)]] = 2
